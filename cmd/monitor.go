@@ -2,9 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"geitaidenwaMonitor/controler"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
-	"monitor/controler"
 	"net/http"
 	"strings"
 )
