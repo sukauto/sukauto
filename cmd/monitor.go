@@ -32,48 +32,38 @@ func main() {
 	monitor := controler.NewServiceController()
 
 	router := gin.Default()
-	router.GET("/monitor/:cmd/:name", func(gctx *gin.Context) {
+	router.GET("/monitor/run/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
-		cmd := strings.ToLower(strings.TrimSpace(gctx.Param("cmd")))
-
-		if cmd == "" {
-			gctx.String(http.StatusOK, "")
+		if err := monitor.Run(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-		response := cmd
-
-		if name == "" {
-			if cmd == controler.STAT {
-				response = strings.Join(monitor.RefreshStatus(), " ")
-			}
-			gctx.String(http.StatusOK, response)
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	router.GET("/monitor/stop/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if err := monitor.Stop(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
-
-		if cmd == controler.STOP {
-			err = monitor.Stop(name)
-			if err != nil {
-				panic(err)
-			}
-		} else if cmd == controler.RUN {
-			err = monitor.Run(name)
-			if err != nil {
-				panic(err)
-			}
-		} else if cmd == controler.RESTART {
-			err = monitor.Restart(name)
-			if err != nil {
-				panic(err)
-			}
-		} else if cmd == controler.STAT {
-			response = monitor.Status(name)
-			if err != nil {
-				panic(err)
-			}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	router.GET("/monitor/restart/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if err := monitor.Restart(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
 		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	router.GET("/monitor/status", func(gctx *gin.Context) {
+		response := strings.Join(monitor.RefreshStatus(), " ")
 		gctx.String(http.StatusOK, response)
-		return
-
+	})
+	router.GET("/monitor/status/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		status := monitor.Status(name)
+		gctx.String(http.StatusOK, status)
 	})
 	panic(router.Run(cfg.Port))
 }
