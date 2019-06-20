@@ -1,16 +1,18 @@
 package main
 
 import (
-	"encoding/json"
 	"geitaidenwaMonitor/controler"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
+	"github.com/jessevdk/go-flags"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 )
 
-type Conf struct {
-	Port string `json:"port"`
+var config struct {
+	Bind       string `long:"bind" env:"BIND" description:"Binding address" default:":8080"`
+	ConfigFile string `long:"config-file" env:"CONFIG_FILE" description:"Path to configuration file" default:"config.json"`
 }
 
 func main() {
@@ -19,20 +21,29 @@ func main() {
 	//  cli for stop/start
 	//  cli for service creation
 
-	jFile, err := ioutil.ReadFile(controler.CFG_PATH)
+	_, err := flags.Parse(&config)
 	if err != nil {
-		panic(err)
-	}
-	var cfg Conf
-	err = json.Unmarshal(jFile, &cfg)
-	if err != nil {
-		panic(err)
+		os.Exit(1)
 	}
 
-	monitor := controler.NewServiceController()
+	monitor := controler.NewServiceControllerByPath(config.ConfigFile)
+
+	var access controler.Access = monitor
 
 	router := gin.Default()
-	router.GET("/monitor/run/:name", func(gctx *gin.Context) {
+	authOnly := router.Group("/monitor").Use(func(gctx *gin.Context) {
+		const realm = "Authorization Required"
+		hRealm := "Basic realm=" + strconv.Quote(realm)
+		auth := gctx.Request.Header.Get("Authorization")
+		up := strings.SplitN(auth, ":", 2)
+		if len(up) == 2 && access.Login(up[0], up[1]) == nil {
+			gctx.Next()
+			return
+		}
+		gctx.Header("WWW-Authenticate", hRealm)
+		gctx.AbortWithStatus(http.StatusUnauthorized)
+	})
+	authOnly.GET("/run/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		if err := monitor.Run(name); err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
@@ -40,7 +51,7 @@ func main() {
 		}
 		gctx.AbortWithStatus(http.StatusNoContent)
 	})
-	router.GET("/monitor/stop/:name", func(gctx *gin.Context) {
+	authOnly.GET("/stop/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		if err := monitor.Stop(name); err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
@@ -48,7 +59,7 @@ func main() {
 		}
 		gctx.AbortWithStatus(http.StatusNoContent)
 	})
-	router.GET("/monitor/restart/:name", func(gctx *gin.Context) {
+	authOnly.GET("/restart/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		if err := monitor.Restart(name); err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
@@ -56,14 +67,14 @@ func main() {
 		}
 		gctx.AbortWithStatus(http.StatusNoContent)
 	})
-	router.GET("/monitor/status", func(gctx *gin.Context) {
+	authOnly.GET("/status", func(gctx *gin.Context) {
 		response := monitor.RefreshStatus()
 		gctx.IndentedJSON(http.StatusOK, response)
 	})
-	router.GET("/monitor/status/:name", func(gctx *gin.Context) {
+	authOnly.GET("/status/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		status := monitor.Status(name)
 		gctx.IndentedJSON(http.StatusOK, status)
 	})
-	panic(router.Run(cfg.Port))
+	panic(router.Run(config.Bind))
 }

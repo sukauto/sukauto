@@ -3,6 +3,7 @@ package controler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"geitaidenwaMonitor/templates"
 	"io"
@@ -12,6 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+type Access interface {
+	Login(username string, password string) (err error)
+}
 
 type ServiceController interface {
 	RefreshStatus() AllStatuses
@@ -24,19 +29,31 @@ type ServiceController interface {
 	Create(service NewService) error
 }
 
-type Conf struct {
-	Services []string `json:"services"`
-	Global   bool     `json:"global"` // as a system-wide services, otherwise - user based
-	location string   `json:"-"`      // config file location
+type AccessServiceController interface {
+	ServiceController
+	Access
 }
 
-func NewServiceControllerByPath(location string) ServiceController {
+type Conf struct {
+	Services []string          `json:"services,omitempty"`
+	Global   bool              `json:"global"` // as a system-wide services, otherwise - user based
+	Users    map[string]string `json:"users"`  // no users means no login
+	location string            `json:"-"`      // config file location
+}
+
+func NewServiceControllerByPath(location string) AccessServiceController {
 	jFile, err := ioutil.ReadFile(location)
 	if os.IsNotExist(err) {
 		// create default
-		return &Conf{
+		cfg := &Conf{
+			Users:    map[string]string{"root": "root"},
 			location: location,
 		}
+		err = cfg.save()
+		if err != nil {
+			panic(err)
+		}
+		return cfg
 	}
 	if err != nil {
 		panic(err)
@@ -52,7 +69,7 @@ func NewServiceControllerByPath(location string) ServiceController {
 	return &data
 }
 
-func NewServiceController() ServiceController {
+func NewServiceController() AccessServiceController {
 	return NewServiceControllerByPath(CFG_PATH)
 }
 
@@ -154,6 +171,17 @@ func (cfg *Conf) Enable(name string) error {
 func (cfg *Conf) Disable(name string) error {
 	_, err := control(name, CmdDisable, !cfg.Global)
 	return err
+}
+
+func (cfg *Conf) Login(username string, password string) (err error) {
+	if len(cfg.Users) == 0 {
+		return nil
+	}
+	expected := cfg.Users[username]
+	if expected != password {
+		return errors.New("invalid user or password")
+	}
+	return nil
 }
 
 func (cfg *Conf) save() error {
