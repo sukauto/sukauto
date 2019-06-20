@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -27,6 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
+	Log(name string) (string, error)
 }
 
 type AccessServiceController interface {
@@ -184,6 +186,10 @@ func (cfg *Conf) Login(username string, password string) (err error) {
 	return nil
 }
 
+func (cfg *Conf) Log(name string) (string, error) {
+	return journal(name, !cfg.Global)
+}
+
 func (cfg *Conf) save() error {
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
@@ -207,6 +213,27 @@ func control(name string, operation string, user bool) (string, error) {
 		return "", err
 	}
 	res := stdout.String()
+
+	return res, nil
+}
+
+func journal(name string, user bool) (string, error) {
+	stdout := &bytes.Buffer{}
+	var args = []string{ModeMergeJournals, ModeNoPages, ModeQuite, ModeLimit, strconv.Itoa(LogLimit)}
+	if user {
+		args = append(args, ModeUserUnit)
+	} else {
+		args = append(args, ModeSystemUnit)
+	}
+	args = append(args, name)
+	cmd := exec.Command(JournalCommand, args...)
+	cmd.Stdout = io.Writer(stdout)
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	res := strings.TrimSpace(stdout.String())
 
 	return res, nil
 }
