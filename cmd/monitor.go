@@ -57,13 +57,13 @@ func main() {
 		gctx.AbortWithStatus(http.StatusNoContent)
 	})
 	router.GET("/monitor/status", func(gctx *gin.Context) {
-		response := strings.Join(monitor.RefreshStatus(), " ")
-		gctx.String(http.StatusOK, response)
+		response := monitor.RefreshStatus()
+		gctx.IndentedJSON(http.StatusOK, response)
 	})
 	router.GET("/monitor/status/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		status := monitor.Status(name)
-		gctx.String(http.StatusOK, status)
+		gctx.IndentedJSON(http.StatusOK, status)
 	})
 	panic(router.Run(cfg.Port))
 }
