@@ -9,10 +9,14 @@ import (
 	"strings"
 )
 
-func NewHTTP(controller controler.ServiceController, access controler.Access) *gin.Engine {
+func NewHTTP(controller controler.ServiceController, access controler.Access, cors bool) *gin.Engine {
 	router := gin.Default()
+
+	if cors {
+		router.Use(CORSMiddleware())
+	}
+
 	authOnly := router.Group("/monitor").Use(func(gctx *gin.Context) {
-		const realm = "Authorization Required"
 		hRealm := "Basic realm=" + strconv.Quote(Realm)
 		authBase := gctx.Request.Header.Get("Authorization")
 		authScheme := strings.Split(authBase, " ")
@@ -75,5 +79,50 @@ func NewHTTP(controller controler.ServiceController, access controler.Access) *g
 			gctx.String(http.StatusOK, log)
 		}
 	})
+	authOnly.GET("/enable/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if err := controller.Enable(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	authOnly.GET("/disable/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if err := controller.Disable(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	authOnly.POST("/create", func(gctx *gin.Context) {
+		var newService controler.NewService
+		err := gctx.BindJSON(&newService)
+		if err != nil {
+			gctx.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
+		if err := controller.Create(newService); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
 	return router
+}
+
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
 }
