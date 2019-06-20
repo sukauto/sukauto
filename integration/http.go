@@ -15,6 +15,10 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 	if cors {
 		router.Use(CORSMiddleware())
 	}
+	router.GET("/", func(gctx *gin.Context) {
+		gctx.Redirect(http.StatusTemporaryRedirect, "public")
+	})
+	router.StaticFS("/public/", assetFS())
 
 	authOnly := router.Group("/monitor").Use(func(gctx *gin.Context) {
 		hRealm := "Basic realm=" + strconv.Quote(Realm)
