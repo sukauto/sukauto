@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"geitaidenwaMonitor/controler"
 	"github.com/gin-gonic/gin"
 	"github.com/jessevdk/go-flags"
@@ -34,8 +35,18 @@ func main() {
 	authOnly := router.Group("/monitor").Use(func(gctx *gin.Context) {
 		const realm = "Authorization Required"
 		hRealm := "Basic realm=" + strconv.Quote(realm)
-		auth := gctx.Request.Header.Get("Authorization")
-		up := strings.SplitN(auth, ":", 2)
+		authBase := gctx.Request.Header.Get("Authorization")
+		authScheme := strings.Split(authBase, " ")
+		if authScheme[0] != "Basic" || len(authScheme) != 2 {
+			gctx.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		auth, err := base64.StdEncoding.DecodeString(authScheme[1])
+		if err != nil {
+			gctx.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
+		up := strings.SplitN(string(auth), ":", 2)
 		if len(up) == 2 && access.Login(up[0], up[1]) == nil {
 			gctx.Next()
 			return
