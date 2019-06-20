@@ -76,7 +76,7 @@ func NewServiceController() AccessServiceController {
 }
 
 func (cfg *Conf) RefreshStatus() AllStatuses {
-	res := make([]ServiceStatus, len(cfg.Services))
+	res := make([]ServiceStatus, 0)
 	for _, srv := range cfg.Services {
 		result := cfg.Status(srv)
 		fmt.Println(result)
