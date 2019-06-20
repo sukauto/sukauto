@@ -21,12 +21,14 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 		authBase := gctx.Request.Header.Get("Authorization")
 		authScheme := strings.Split(authBase, " ")
 		if authScheme[0] != "Basic" || len(authScheme) != 2 {
-			gctx.AbortWithStatus(http.StatusBadRequest)
+			gctx.Header(WWWAuthHeader, hRealm)
+			gctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		auth, err := base64.StdEncoding.DecodeString(authScheme[1])
 		if err != nil {
-			gctx.AbortWithError(http.StatusBadRequest, err)
+			gctx.Header(WWWAuthHeader, hRealm)
+			gctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		up := strings.SplitN(string(auth), ":", 2)
