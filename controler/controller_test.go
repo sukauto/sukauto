@@ -1,6 +1,7 @@
 package controler
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"testing"
@@ -13,7 +14,7 @@ func TestConf_Create(t *testing.T) {
 	controller := NewServiceControllerByPath(testData + "/config.json")
 	err := controller.Create(NewService{
 		Name:             "test-gm",
-		Command:          resolveBin("nc") + " -l 9000",
+		Command:          resolveBin("nc") + " -v -l 9000",
 		WorkingDirectory: testData,
 	})
 	if err != nil {
@@ -37,6 +38,17 @@ func TestConf_Create(t *testing.T) {
 		t.Error("mismatch status:", status.Status)
 		return
 	}
+
+	log, err := controller.Log("test-gm")
+	if err != nil {
+		t.Error("log", err)
+		return
+	}
+	if len(log) == 0 {
+		t.Error("empty log")
+		return
+	}
+	fmt.Println(log)
 
 	err = controller.Stop("test-gm")
 	if err != nil {

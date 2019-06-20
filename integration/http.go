@@ -66,6 +66,14 @@ func NewHTTP(controller controler.ServiceController, access controler.Access) *g
 		status := controller.Status(name)
 		gctx.IndentedJSON(http.StatusOK, status)
 	})
-
+	authOnly.GET("/log/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if log, err := controller.Log(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		} else {
+			gctx.String(http.StatusOK, log)
+		}
+	})
 	return router
 }

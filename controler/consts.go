@@ -1,20 +1,29 @@
 package controler
 
 const (
-	COMMAND    = "systemctl"
-	STAT       = "status"
-	STOP       = "stop"
-	RUN        = "start"
-	RESTART    = "restart"
-	CFG_PATH   = "config.json"
-	CmdEnable  = "enable"
-	CmdDisable = "disable"
-	CmdShow    = "show"
+	COMMAND        = "systemctl"
+	JournalCommand = "journalctl"
+	STAT           = "status"
+	STOP           = "stop"
+	RUN            = "start"
+	RESTART        = "restart"
+	CFG_PATH       = "config.json"
+	CmdEnable      = "enable"
+	CmdDisable     = "disable"
+	CmdShow        = "show"
+	LogLimit       = 1024
 )
 
 // Modes
 const (
 	ModeUser = "--user"
+	// journal
+	ModeSystemUnit    = "-u"
+	ModeUserUnit      = "--user-unit"
+	ModeNoPages       = "--no-pager"
+	ModeQuite         = "-q"
+	ModeMergeJournals = "-m"
+	ModeLimit         = "-n"
 )
 
 // Fields
