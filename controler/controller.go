@@ -326,22 +326,3 @@ func controlQueryField(name string, field string, user bool) (string, error) {
 
 	return res, nil
 }
-
-func getField(srvName string, field string, user bool) (string, error) {
-	stdout := &bytes.Buffer{}
-	var args []string
-	if user {
-		args = append(args, ModeUser)
-	}
-	args = append(args, CmdShow, "-p", field, srvName)
-	cmd := exec.Command(COMMAND, args...)
-	cmd.Stdout = io.Writer(stdout)
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		return "", err
-	}
-	res := strings.TrimSpace(stdout.String())
-
-	return res, nil
-}
