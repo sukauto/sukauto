@@ -15,3 +15,7 @@ type NewService struct {
 	WorkingDirectory string            `json:"work_dir" form:"work_dir" bind:"work_dir"`
 	Environment      map[string]string `json:"environment" form:"environment" bind:"environment"`
 }
+
+type PreparedService struct {
+	Name string `json:"name" form:"name" bind:"command"`
+}
