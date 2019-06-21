@@ -28,7 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
-  Update(name string) error
+	Update(name string) error
 	Attach(name string) error // attach exists service
 	Log(name string) (string, error)
 }
@@ -70,6 +70,7 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 		panic(err)
 	}
 	data.location = location
+	data.updCmd = updcmd
 
 	fmt.Printf("[MONITOR]: Append srv list: %s", &data.Services)
 	return &data
