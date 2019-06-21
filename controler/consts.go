@@ -1,7 +1,9 @@
 package controler
 
 const (
+	SHELL          = "/bin/sh"
 	COMMAND        = "systemctl"
+	WORKDIR        = "WorkingDirectory"
 	JournalCommand = "journalctl"
 	STAT           = "status"
 	STOP           = "stop"

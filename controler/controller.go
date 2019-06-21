@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"geitaidenwaMonitor/templates"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sukauto/templates"
 )
 
 type Access interface {
@@ -28,6 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
+	Update(name string) error
 	Attach(name string) error // attach exists service
 	Log(name string) (string, error)
 }
@@ -42,15 +43,17 @@ type Conf struct {
 	Global   bool              `json:"global"` // as a system-wide services, otherwise - user based
 	Users    map[string]string `json:"users"`  // no users means no login
 	location string            `json:"-"`      // config file location
+	updCmd   string
 }
 
-func NewServiceControllerByPath(location string) AccessServiceController {
+func NewServiceControllerByPath(location string, updcmd string) AccessServiceController {
 	jFile, err := ioutil.ReadFile(location)
 	if os.IsNotExist(err) {
 		// create default
 		cfg := &Conf{
 			Users:    map[string]string{"root": "root"},
 			location: location,
+			updCmd:   updcmd,
 		}
 		err = cfg.save()
 		if err != nil {
@@ -67,13 +70,14 @@ func NewServiceControllerByPath(location string) AccessServiceController {
 		panic(err)
 	}
 	data.location = location
+	data.updCmd = updcmd
 
 	fmt.Printf("[MONITOR]: Append srv list: %s", &data.Services)
 	return &data
 }
 
-func NewServiceController() AccessServiceController {
-	return NewServiceControllerByPath(CFG_PATH)
+func NewServiceController(cmdUpd string) AccessServiceController {
+	return NewServiceControllerByPath(CFG_PATH, cmdUpd)
 }
 
 func (cfg *Conf) RefreshStatus() AllStatuses {
@@ -120,6 +124,53 @@ func (cfg *Conf) Stop(name string) error {
 		return err
 	}
 	return nil
+}
+
+func (cfg *Conf) Update(name string) error {
+	var err error
+	preUpdInfo := cfg.Status(name)
+
+	err = cfg.Stop(name)
+	if err != nil {
+		fmt.Printf("[ERROR]: Stop srv on upd: %s", name)
+		return err
+	}
+
+	_, err = updater(name, cfg.updCmd, !cfg.Global)
+	if err != nil {
+		fmt.Printf("[ERROR]: Update srv: %s", name)
+		return err
+	}
+
+	if preUpdInfo.Status == "running" {
+		err = cfg.Run(name)
+		if err != nil {
+			fmt.Printf("[ERROR]: Start srv on upd: %s", name)
+			return err
+		}
+	}
+	return nil
+}
+
+func updater(name string, updcmd string, user bool) (string, error) {
+	stdout := &bytes.Buffer{}
+	srvWorkDir, _ := getField(name, WORKDIR, user)
+	// remove 'WorkingDirectory=' from string
+	srvWorkDir = strings.Split(srvWorkDir, WORKDIR+"=")[1]
+	srvWorkDir = strings.TrimSpace(srvWorkDir)
+
+	cmd := exec.Command(SHELL, "-c", updcmd)
+	cmd.Stdout = io.Writer(stdout)
+	cmd.Stderr = os.Stderr
+	cmd.Dir = srvWorkDir
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+
+	res := stdout.String()
+	return res, nil
+
 }
 
 func (cfg *Conf) Create(service NewService) error {
@@ -251,6 +302,25 @@ func controlQueryField(name string, field string, user bool) (string, error) {
 		args = append(args, ModeUser)
 	}
 	args = append(args, CmdShow, "-p", field, "--value", name)
+	cmd := exec.Command(COMMAND, args...)
+	cmd.Stdout = io.Writer(stdout)
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	res := strings.TrimSpace(stdout.String())
+
+	return res, nil
+}
+
+func getField(srvName string, field string, user bool) (string, error) {
+	stdout := &bytes.Buffer{}
+	var args []string
+	if user {
+		args = append(args, ModeUser)
+	}
+	args = append(args, CmdShow, "-p", field, srvName)
 	cmd := exec.Command(COMMAND, args...)
 	cmd.Stdout = io.Writer(stdout)
 	cmd.Stderr = os.Stderr
