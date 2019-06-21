@@ -20,10 +20,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	monitor := controler.NewServiceControllerByPath(config.ConfigFile)
+	monitor := controler.NewServiceControllerByPath(config.ConfigFile, config.UpdCmd)
 
 	var access controler.Access = monitor
-	router := integration.NewHTTP(monitor, access, config.CORS, config.UpdCmd)
+	router := integration.NewHTTP(monitor, access, config.CORS)
 
 	panic(router.Run(config.Bind))
 }

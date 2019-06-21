@@ -28,7 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
-	Update(name string, updcmd string) error
+	Update(name string) error
 	Log(name string) (string, error)
 }
 
@@ -42,15 +42,17 @@ type Conf struct {
 	Global   bool              `json:"global"` // as a system-wide services, otherwise - user based
 	Users    map[string]string `json:"users"`  // no users means no login
 	location string            `json:"-"`      // config file location
+	updCmd   string
 }
 
-func NewServiceControllerByPath(location string) AccessServiceController {
+func NewServiceControllerByPath(location string, updcmd string) AccessServiceController {
 	jFile, err := ioutil.ReadFile(location)
 	if os.IsNotExist(err) {
 		// create default
 		cfg := &Conf{
 			Users:    map[string]string{"root": "root"},
 			location: location,
+			updCmd:   updcmd,
 		}
 		err = cfg.save()
 		if err != nil {
@@ -122,8 +124,8 @@ func (cfg *Conf) Stop(name string) error {
 	return nil
 }
 
-func (cfg *Conf) Update(name string, updcmd string) error {
-	_, err := updater(name, updcmd, !cfg.Global)
+func (cfg *Conf) Update(name string) error {
+	_, err := updater(name, cfg.updCmd, !cfg.Global)
 	if err != nil {
 		fmt.Printf("[ERROR]: Update srv: %s", name)
 		return err
