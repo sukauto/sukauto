@@ -159,7 +159,7 @@ func updater(name string, updcmd string, user bool) (string, error) {
 	srvWorkDir = strings.Split(srvWorkDir, WORKDIR+"=")[1]
 	srvWorkDir = strings.TrimSpace(srvWorkDir)
 
-	cmd := exec.Command(updcmd)
+	cmd := exec.Command(SHELL, "-c", updcmd)
 	cmd.Stdout = io.Writer(stdout)
 	cmd.Stderr = os.Stderr
 	cmd.Dir = srvWorkDir
