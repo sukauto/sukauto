@@ -130,12 +130,10 @@ func (cfg *Conf) Update(name string) error {
 	var err error
 	preUpdInfo := cfg.Status(name)
 
-	if preUpdInfo.Status == "running" {
-		err = cfg.Stop(name)
-		if err != nil {
-			fmt.Printf("[ERROR]: Stop srv on upd: %s", name)
-			return err
-		}
+	err = cfg.Stop(name)
+	if err != nil {
+		fmt.Printf("[ERROR]: Stop srv on upd: %s", name)
+		return err
 	}
 
 	_, err = updater(name, cfg.updCmd, !cfg.Global)
@@ -166,15 +164,13 @@ func updater(name string, updcmd string, user bool) (string, error) {
 	srvWorkDir = strings.Split(srvWorkDir, WORKDIR+"=")[1]
 	srvWorkDir = strings.TrimSpace(srvWorkDir)
 
-	if srvWorkDir != "" {
-		args = append(args, "-C", srvWorkDir, PULL)
-		cmd := exec.Command(updcmd, args...)
-		cmd.Stdout = io.Writer(stdout)
-		cmd.Stderr = os.Stderr
-		err := cmd.Run()
-		if err != nil {
-			return "", err
-		}
+	cmd := exec.Command(updcmd, args...)
+	cmd.Stdout = io.Writer(stdout)
+	cmd.Stderr = os.Stderr
+	cmd.Dir = srvWorkDir
+	err := cmd.Run()
+	if err != nil {
+		return "", err
 	}
 
 	res := stdout.String()
