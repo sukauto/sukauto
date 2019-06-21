@@ -30,6 +30,7 @@ type ServiceController interface {
 	Create(service NewService) error
 	Update(name string) error
 	Attach(name string) error // attach exists service
+	Forget(name string) error // forget about service
 	Log(name string) (string, error)
 }
 
@@ -247,6 +248,16 @@ func (cfg *Conf) Login(username string, password string) (err error) {
 
 func (cfg *Conf) Log(name string) (string, error) {
 	return journal(name, !cfg.Global)
+}
+
+func (cfg *Conf) Forget(name string) error {
+	for i, srv := range cfg.Services {
+		if srv == name {
+			cfg.Services = append(cfg.Services[:i], cfg.Services[i+1:]...)
+			break
+		}
+	}
+	return cfg.save()
 }
 
 func (cfg *Conf) save() error {
