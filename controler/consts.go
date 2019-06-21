@@ -1,5 +1,7 @@
 package controler
 
+var updCMD string
+
 const (
 	COMMAND        = "systemctl"
 	GIT            = "git"

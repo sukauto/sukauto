@@ -9,7 +9,7 @@ import (
 	"sukauto/controler"
 )
 
-func NewHTTP(controller controler.ServiceController, access controler.Access, cors bool) *gin.Engine {
+func NewHTTP(controller controler.ServiceController, access controler.Access, cors bool, updcmd string) *gin.Engine {
 	router := gin.Default()
 
 	if cors {
@@ -61,7 +61,7 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 	})
 	authOnly.GET("/update/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
-		if err := controller.Update(name); err != nil {
+		if err := controller.Update(name, updcmd); err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}

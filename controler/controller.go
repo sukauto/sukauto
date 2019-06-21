@@ -28,7 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
-	Update(name string) error
+	Update(name string, updcmd string) error
 	Log(name string) (string, error)
 }
 
@@ -122,8 +122,8 @@ func (cfg *Conf) Stop(name string) error {
 	return nil
 }
 
-func (cfg *Conf) Update(name string) error {
-	_, err := updater(name, !cfg.Global)
+func (cfg *Conf) Update(name string, updcmd string) error {
+	_, err := updater(name, updcmd, !cfg.Global)
 	if err != nil {
 		fmt.Printf("[ERROR]: Update srv: %s", name)
 		return err
@@ -131,7 +131,7 @@ func (cfg *Conf) Update(name string) error {
 	return nil
 }
 
-func updater(name string, user bool) (string, error) {
+func updater(name string, updcmd string, user bool) (string, error) {
 	_, err := control(name, STOP, user)
 
 	stdout := &bytes.Buffer{}
@@ -147,7 +147,7 @@ func updater(name string, user bool) (string, error) {
 
 	if srvWorkDir != "" {
 		args = append(args, "-C", srvWorkDir, PULL)
-		cmd := exec.Command(GIT, args...)
+		cmd := exec.Command(updcmd, args...)
 		cmd.Stdout = io.Writer(stdout)
 		cmd.Stderr = os.Stderr
 		err = cmd.Run()

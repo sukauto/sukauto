@@ -10,6 +10,7 @@ import (
 var config struct {
 	Bind       string `long:"bind" env:"BIND" description:"Binding address" default:":8080"`
 	ConfigFile string `long:"config-file" env:"CONFIG_FILE" description:"Path to configuration file" default:"config.json"`
+	UpdCmd     string `long:"updcmd" env:"UPDCMD" description:"command for update" default:"git"`
 	CORS       bool   `long:"cors" env:"CORS" description:"Enable CORS"`
 }
 
@@ -22,7 +23,7 @@ func main() {
 	monitor := controler.NewServiceControllerByPath(config.ConfigFile)
 
 	var access controler.Access = monitor
-	router := integration.NewHTTP(monitor, access, config.CORS)
+	router := integration.NewHTTP(monitor, access, config.CORS, config.UpdCmd)
 
 	panic(router.Run(config.Bind))
 }
