@@ -2,6 +2,7 @@ package integration
 
 import (
 	"encoding/base64"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -84,7 +85,7 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 		status := controller.Status(name)
 		gctx.IndentedJSON(http.StatusOK, status)
 	})
-	authOnly.GET("/log/:name", func(gctx *gin.Context) {
+	authOnly.Use(gzip.Gzip(gzip.BestCompression)).GET("/log/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		if log, err := controller.Log(name); err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
