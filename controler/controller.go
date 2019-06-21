@@ -74,8 +74,8 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	return &data
 }
 
-func NewServiceController() AccessServiceController {
-	return NewServiceControllerByPath(CFG_PATH)
+func NewServiceController(cmdUpd string) AccessServiceController {
+	return NewServiceControllerByPath(CFG_PATH, cmdUpd)
 }
 
 func (cfg *Conf) RefreshStatus() AllStatuses {
