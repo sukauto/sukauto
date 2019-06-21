@@ -2,11 +2,11 @@ package integration
 
 import (
 	"encoding/base64"
-	"geitaidenwaMonitor/controler"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
 	"strings"
+	"sukauto/controler"
 )
 
 func NewHTTP(controller controler.ServiceController, access controler.Access, cors bool) *gin.Engine {
@@ -54,6 +54,14 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 	authOnly.GET("/stop/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		if err := controller.Stop(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	authOnly.GET("/update/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if err := controller.Update(name); err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"geitaidenwaMonitor/controler"
-	"geitaidenwaMonitor/integration"
 	"github.com/jessevdk/go-flags"
 	"os"
+	"sukauto/controler"
+	"sukauto/integration"
 )
 
 var config struct {
@@ -14,11 +14,6 @@ var config struct {
 }
 
 func main() {
-	// TODO Call every 10 sec stat for all connected services,
-	//  cli for add services to monitor
-	//  cli for stop/start
-	//  cli for service creation
-
 	_, err := flags.Parse(&config)
 	if err != nil {
 		os.Exit(1)

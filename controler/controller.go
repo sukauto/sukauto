@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"geitaidenwaMonitor/templates"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sukauto/templates"
 )
 
 type Access interface {
@@ -28,6 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
+	Update(name string) error
 	Log(name string) (string, error)
 }
 
@@ -119,6 +120,51 @@ func (cfg *Conf) Stop(name string) error {
 		return err
 	}
 	return nil
+}
+
+func (cfg *Conf) Update(name string) error {
+	_, err := updater(name, !cfg.Global)
+	if err != nil {
+		fmt.Printf("[ERROR]: Update srv: %s", name)
+		return err
+	}
+	return nil
+}
+
+func updater(name string, user bool) (string, error) {
+	_, err := control(name, STOP, user)
+
+	stdout := &bytes.Buffer{}
+	var args []string
+	if user {
+		args = append(args, ModeUser)
+	}
+
+	srvWorkDir, _ := getField(name, WORKDIR, user)
+	// remove 'WorkingDirectory=' from string
+	srvWorkDir = strings.Split(srvWorkDir, WORKDIR+"=")[1]
+	srvWorkDir = strings.TrimSpace(srvWorkDir)
+
+	if srvWorkDir != "" {
+		args = append(args, "-C", srvWorkDir, PULL)
+		cmd := exec.Command(GIT, args...)
+		cmd.Stdout = io.Writer(stdout)
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	res := stdout.String()
+
+	_, err = control(name, RUN, user)
+	if err != nil {
+		return "", err
+	}
+
+	return res, nil
+
 }
 
 func (cfg *Conf) Create(service NewService) error {
@@ -245,6 +291,25 @@ func controlQueryField(name string, field string, user bool) (string, error) {
 		args = append(args, ModeUser)
 	}
 	args = append(args, CmdShow, "-p", field, "--value", name)
+	cmd := exec.Command(COMMAND, args...)
+	cmd.Stdout = io.Writer(stdout)
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	res := strings.TrimSpace(stdout.String())
+
+	return res, nil
+}
+
+func getField(srvName string, field string, user bool) (string, error) {
+	stdout := &bytes.Buffer{}
+	var args []string
+	if user {
+		args = append(args, ModeUser)
+	}
+	args = append(args, CmdShow, "-p", field, srvName)
 	cmd := exec.Command(COMMAND, args...)
 	cmd.Stdout = io.Writer(stdout)
 	cmd.Stderr = os.Stderr

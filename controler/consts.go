@@ -2,6 +2,9 @@ package controler
 
 const (
 	COMMAND        = "systemctl"
+	GIT            = "git"
+	PULL           = "pull"
+	WORKDIR        = "WorkingDirectory"
 	JournalCommand = "journalctl"
 	STAT           = "status"
 	STOP           = "stop"
