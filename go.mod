@@ -1,4 +1,4 @@
-module geitaidenwaMonitor
+module sukauto
 
 go 1.12
 
