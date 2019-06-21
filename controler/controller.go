@@ -28,6 +28,7 @@ type ServiceController interface {
 	Enable(name string) error  // enable autostart
 	Disable(name string) error // disable autostart
 	Create(service NewService) error
+	Attach(name string) error // attach exists service
 	Log(name string) (string, error)
 }
 
@@ -162,6 +163,11 @@ func (cfg *Conf) Create(service NewService) error {
 	// save to config
 	// TODO: maybe save full information
 	cfg.Services = append(cfg.Services, service.Name)
+	return cfg.save()
+}
+
+func (cfg *Conf) Attach(name string) error {
+	cfg.Services = append(cfg.Services, name)
 	return cfg.save()
 }
 
