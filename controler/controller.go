@@ -127,10 +127,15 @@ func (cfg *Conf) Stop(name string) error {
 }
 
 func (cfg *Conf) Update(name string) error {
-	err := cfg.Stop(name)
-	if err != nil {
-		fmt.Printf("[ERROR]: Stop srv on upd: %s", name)
-		return err
+	var err error
+	preUpdInfo := cfg.Status(name)
+
+	if preUpdInfo.Status == "running" {
+		err = cfg.Stop(name)
+		if err != nil {
+			fmt.Printf("[ERROR]: Stop srv on upd: %s", name)
+			return err
+		}
 	}
 
 	_, err = updater(name, cfg.updCmd, !cfg.Global)
@@ -139,12 +144,13 @@ func (cfg *Conf) Update(name string) error {
 		return err
 	}
 
-	err = cfg.Run(name)
-	if err != nil {
-		fmt.Printf("[ERROR]: Start srv on upd: %s", name)
-		return err
+	if preUpdInfo.Status == "running" {
+		err = cfg.Run(name)
+		if err != nil {
+			fmt.Printf("[ERROR]: Start srv on upd: %s", name)
+			return err
+		}
 	}
-
 	return nil
 }
 
