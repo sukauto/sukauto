@@ -1,8 +1,7 @@
 package controler
 
-var updCMD string
-
 const (
+	SHELL          = "/bin/sh"
 	COMMAND        = "systemctl"
 	WORKDIR        = "WorkingDirectory"
 	JournalCommand = "journalctl"

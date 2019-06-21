@@ -154,17 +154,12 @@ func (cfg *Conf) Update(name string) error {
 
 func updater(name string, updcmd string, user bool) (string, error) {
 	stdout := &bytes.Buffer{}
-	var args []string
-	if user {
-		args = append(args, ModeUser)
-	}
-
 	srvWorkDir, _ := getField(name, WORKDIR, user)
 	// remove 'WorkingDirectory=' from string
 	srvWorkDir = strings.Split(srvWorkDir, WORKDIR+"=")[1]
 	srvWorkDir = strings.TrimSpace(srvWorkDir)
 
-	cmd := exec.Command(updcmd, args...)
+	cmd := exec.Command(updcmd)
 	cmd.Stdout = io.Writer(stdout)
 	cmd.Stderr = os.Stderr
 	cmd.Dir = srvWorkDir
