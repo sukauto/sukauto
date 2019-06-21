@@ -125,17 +125,28 @@ func (cfg *Conf) Stop(name string) error {
 }
 
 func (cfg *Conf) Update(name string) error {
-	_, err := updater(name, cfg.updCmd, !cfg.Global)
+	err := cfg.Stop(name)
+	if err != nil {
+		fmt.Printf("[ERROR]: Stop srv on upd: %s", name)
+		return err
+	}
+
+	_, err = updater(name, cfg.updCmd, !cfg.Global)
 	if err != nil {
 		fmt.Printf("[ERROR]: Update srv: %s", name)
 		return err
 	}
+
+	err = cfg.Run(name)
+	if err != nil {
+		fmt.Printf("[ERROR]: Start srv on upd: %s", name)
+		return err
+	}
+
 	return nil
 }
 
 func updater(name string, updcmd string, user bool) (string, error) {
-	_, err := control(name, STOP, user)
-
 	stdout := &bytes.Buffer{}
 	var args []string
 	if user {
@@ -152,19 +163,13 @@ func updater(name string, updcmd string, user bool) (string, error) {
 		cmd := exec.Command(updcmd, args...)
 		cmd.Stdout = io.Writer(stdout)
 		cmd.Stderr = os.Stderr
-		err = cmd.Run()
+		err := cmd.Run()
 		if err != nil {
 			return "", err
 		}
 	}
 
 	res := stdout.String()
-
-	_, err = control(name, RUN, user)
-	if err != nil {
-		return "", err
-	}
-
 	return res, nil
 
 }
