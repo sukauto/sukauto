@@ -114,6 +114,19 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 		}
 		gctx.AbortWithStatus(http.StatusNoContent)
 	})
+	authOnly.POST("/attach", func(gctx *gin.Context) {
+		var newService controler.PreparedService
+		err := gctx.BindJSON(&newService)
+		if err != nil {
+			gctx.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
+		if err := controller.Attach(newService.Name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
 	return router
 }
 
