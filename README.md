@@ -1,5 +1,6 @@
 # Sukauto
 #### simple service monitor
+Sukauto is monitor client
 ### config example:
 { 
 
