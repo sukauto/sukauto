@@ -26,7 +26,8 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 	})
 	router.StaticFS("/public/", assetFS())
 
-	authOnly := router.Group("/monitor").Use(func(gctx *gin.Context) {
+	authOnly := router.Group("/monitor")
+	authOnly.Use(func(gctx *gin.Context) {
 		hRealm := "Basic realm=" + strconv.Quote(Realm)
 		authBase := gctx.Request.Header.Get("Authorization")
 		authScheme := strings.Split(authBase, " ")
@@ -144,6 +145,59 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 			return
 		}
 		if err := controller.Attach(newService.Name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	// --------------- groups section
+	groups := authOnly.Group("/group")
+	// all groups
+	groups.GET("/", func(gctx *gin.Context) {
+		gctx.IndentedJSON(http.StatusOK, controller.Groups())
+	})
+	// create group
+	groups.POST("/:name", func(gctx *gin.Context) {
+		group := gctx.Param("name")
+		err := controller.Group(group)
+		if err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	// remove group
+	groups.DELETE("/:name", func(gctx *gin.Context) {
+		group := gctx.Param("name")
+		err := controller.Ungroup(group)
+		if err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	// members of group
+	groups.GET("/:name", func(gctx *gin.Context) {
+		group := gctx.Param("name")
+		gctx.IndentedJSON(http.StatusOK, controller.Members(group))
+	})
+	// join service to group
+	groups.POST("/:name/:service", func(gctx *gin.Context) {
+		group := gctx.Param("name")
+		service := gctx.Param("service")
+		err := controller.Join(group, service)
+		if err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
+	// leave service from group
+	groups.DELETE("/:name/:service", func(gctx *gin.Context) {
+		group := gctx.Param("name")
+		service := gctx.Param("service")
+		err := controller.Leave(group, service)
+		if err != nil {
 			gctx.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
