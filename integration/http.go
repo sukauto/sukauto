@@ -110,6 +110,14 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 		}
 		gctx.AbortWithStatus(http.StatusNoContent)
 	})
+	authOnly.GET("/forget/:name", func(gctx *gin.Context) {
+		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
+		if err := controller.Forget(name); err != nil {
+			gctx.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+		gctx.AbortWithStatus(http.StatusNoContent)
+	})
 	authOnly.POST("/create", func(gctx *gin.Context) {
 		var newService controler.NewService
 		err := gctx.BindJSON(&newService)
