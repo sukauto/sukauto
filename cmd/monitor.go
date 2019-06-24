@@ -8,10 +8,10 @@ import (
 )
 
 var config struct {
-	Bind       string `long:"bind" env:"BIND" description:"Binding address" default:":8080"`
-	ConfigFile string `long:"config-file" env:"CONFIG_FILE" description:"Path to configuration file" default:"config.json"`
-	UpdCmd     string `long:"updcmd" env:"UPDCMD" description:"command for update" default:"git pull origin master"`
-	CORS       bool   `long:"cors" env:"CORS" description:"Enable CORS"`
+	Bind       string                 `long:"bind" env:"BIND" description:"Binding address" default:":8080"`
+	ConfigFile string                 `long:"config-file" env:"CONFIG_FILE" description:"Path to configuration file" default:"config.json"`
+	UpdCmd     string                 `long:"updcmd" env:"UPDCMD" description:"command for update" default:"git pull origin master"`
+	CORS       integration.CorsConfig `group:"cors" env-namespace:"CORS" namespace:"cors"`
 }
 
 func main() {

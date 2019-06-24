@@ -7,7 +7,7 @@ require (
 	github.com/gin-contrib/gzip v0.0.1
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.4.0
-	github.com/jessevdk/go-flags v1.4.0
+	github.com/jessevdk/go-flags v1.4.1-0.20181221193153-c0795c8afcf4
 	github.com/mattn/go-isatty v0.0.8 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/ugorji/go v1.1.5-pre // indirect

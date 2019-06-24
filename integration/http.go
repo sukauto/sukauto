@@ -10,11 +10,16 @@ import (
 	"sukauto/controler"
 )
 
-func NewHTTP(controller controler.ServiceController, access controler.Access, cors bool) *gin.Engine {
+type CorsConfig struct {
+	Allow  bool   `long:"allow" env:"ALLOW" description:"Allow CORS"`
+	Origin string `long:"origin" env:"ORIGIN" description:"CORS origin host" default:"*"`
+}
+
+func NewHTTP(controller controler.ServiceController, access controler.Access, cors CorsConfig) *gin.Engine {
 	router := gin.Default()
 
-	if cors {
-		router.Use(CORSMiddleware())
+	if cors.Allow {
+		router.Use(CORSMiddleware(cors))
 	}
 	router.GET("/", func(gctx *gin.Context) {
 		gctx.Redirect(http.StatusTemporaryRedirect, "public")
@@ -147,9 +152,9 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 	return router
 }
 
-func CORSMiddleware() gin.HandlerFunc {
+func CORSMiddleware(cors CorsConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", cors.Origin)
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT")
