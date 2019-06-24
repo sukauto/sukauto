@@ -1,6 +1,6 @@
 # Sukauto
 #### simple service monitor
-Sukauto is monitor client
+Check commit
 ### config example:
 { 
 
