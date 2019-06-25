@@ -364,8 +364,8 @@ func (cfg *Conf) Login(username string, password string) (err error) {
 	if len(cfg.Users) == 0 {
 		return nil
 	}
-	expected := cfg.Users[username]
-	if expected != password {
+	expected, ok := cfg.Users[username]
+	if !ok || expected != password {
 		return errors.New("invalid user or password")
 	}
 	return nil
