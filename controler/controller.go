@@ -143,6 +143,9 @@ func (cfg *Conf) Join(groupName string, serviceName string) error {
 			return nil
 		}
 	}
+	if !cfg.isServiceExists(serviceName) {
+		return errors.New("service not exists")
+	}
 	cfg.GroupsList[groupName] = append(cfg.GroupsList[groupName], serviceName)
 	return cfg.saveUnsafe()
 }
@@ -230,6 +233,15 @@ func (cfg *Conf) Update(name string) error {
 		}
 	}
 	return nil
+}
+
+func (cfg *Conf) isServiceExists(name string) bool {
+	for _, srv := range cfg.Services {
+		if srv == name {
+			return true
+		}
+	}
+	return false
 }
 
 func updater(name string, updcmd string, user bool) (string, error) {
@@ -340,6 +352,15 @@ func (cfg *Conf) Forget(name string) error {
 		if srv == name {
 			cfg.Services = append(cfg.Services[:i], cfg.Services[i+1:]...)
 			break
+		}
+	}
+	// remove from groups
+	for group, services := range cfg.GroupsList {
+		for i, srv := range services {
+			if srv == name {
+				cfg.GroupsList[group] = append(services[:i], services[i+1:]...)
+				break
+			}
 		}
 	}
 	return cfg.saveUnsafe()
