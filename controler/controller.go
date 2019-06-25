@@ -22,7 +22,6 @@ type Access interface {
 }
 
 type ServiceController interface {
-	Events() EventSubscriber
 	RefreshStatus() AllStatuses
 	Status(name string) ServiceStatus
 	Restart(name string) error
@@ -43,6 +42,7 @@ type ServiceController interface {
 	Members(groupName string) []string
 	Join(groupName string, serviceName string) error
 	Leave(groupName string, serviceName string) error
+	Events() <-chan Event
 }
 
 type AccessServiceController interface {
@@ -51,14 +51,14 @@ type AccessServiceController interface {
 }
 
 type Conf struct {
-	Services     []string            `json:"services,omitempty"`
-	GroupsList   map[string][]string `json:"groups,omitempty"`
-	Global       bool                `json:"global"` // as a system-wide services, otherwise - user based
-	Users        map[string]string   `json:"users"`  // no users means no login
-	location     string              `json:"-"`      // config file location
-	updCmd       string
-	eventEmitter ServiceEventsEmitter
-	lock         sync.RWMutex
+	Services   []string            `json:"services,omitempty"`
+	GroupsList map[string][]string `json:"groups,omitempty"`
+	Global     bool                `json:"global"` // as a system-wide services, otherwise - user based
+	Users      map[string]string   `json:"users"`  // no users means no login
+	location   string              `json:"-"`      // config file location
+	event      chan Event
+	updCmd     string
+	lock       sync.RWMutex
 }
 
 func NewServiceControllerByPath(location string, updcmd string) AccessServiceController {
@@ -66,10 +66,10 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	if os.IsNotExist(err) {
 		// create default
 		cfg := &Conf{
-			Users:        map[string]string{"root": "root"},
-			location:     location,
-			updCmd:       updcmd,
-			eventEmitter: NewEventEmitter(),
+			Users:    map[string]string{"root": "root"},
+			location: location,
+			updCmd:   updcmd,
+			event:    make(chan Event),
 		}
 		err = cfg.save()
 		if err != nil {
@@ -87,7 +87,7 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	}
 	data.location = location
 	data.updCmd = updcmd
-	data.eventEmitter = NewEventEmitter()
+	data.event = make(chan Event)
 	fmt.Printf("[MONITOR]: Append srv list: %s", &data.Services)
 	return &data
 }
@@ -96,8 +96,8 @@ func NewServiceController(cmdUpd string) AccessServiceController {
 	return NewServiceControllerByPath(CFG_PATH, cmdUpd)
 }
 
-func (cfg *Conf) Events() EventSubscriber {
-	return cfg.eventEmitter
+func (cfg *Conf) Events() <-chan Event {
+	return cfg.event
 }
 
 func (cfg *Conf) Groups() []string {
@@ -174,7 +174,6 @@ func (cfg *Conf) RefreshStatus() AllStatuses {
 	res := make([]ServiceStatus, 0)
 	for _, srv := range cfg.Services {
 		result := cfg.Status(srv)
-		fmt.Println(result)
 		res = append(res, result)
 	}
 	return AllStatuses{Services: res}
@@ -195,7 +194,7 @@ func (cfg *Conf) Restart(name string) error {
 		fmt.Printf("[ERROR]: Restart srv: %s", name)
 		return err
 	} else {
-		cfg.eventEmitter.Restarted(name)
+		cfg.event <- Event{Type: EventRestarted, Name: name}
 	}
 	return nil
 }
@@ -206,7 +205,7 @@ func (cfg *Conf) Run(name string) error {
 		fmt.Printf("[ERROR]: Run srv: %s", name)
 		return err
 	} else {
-		cfg.eventEmitter.Started(name)
+		cfg.event <- Event{Type: EventStarted, Name: name}
 	}
 	return nil
 }
@@ -217,7 +216,7 @@ func (cfg *Conf) Stop(name string) error {
 		fmt.Printf("[ERROR]: Run srv: %s", name)
 		return err
 	} else {
-		cfg.eventEmitter.Stopped(name)
+		cfg.event <- Event{Type: EventStopped, Name: name}
 	}
 	return nil
 }
@@ -245,7 +244,7 @@ func (cfg *Conf) Update(name string) error {
 			return err
 		}
 	}
-	cfg.eventEmitter.Updated(name)
+	cfg.event <- Event{Type: EventUpdated, Name: name}
 	return nil
 }
 
@@ -328,7 +327,7 @@ func (cfg *Conf) Create(service NewService) error {
 	if err != nil {
 		return err
 	}
-	cfg.eventEmitter.Created(service.Name)
+	cfg.event <- Event{Type: EventCreated, Name: service.Name}
 	return nil
 }
 
@@ -340,14 +339,14 @@ func (cfg *Conf) Attach(name string) error {
 	if err != nil {
 		return err
 	}
-	cfg.eventEmitter.Created(name)
+	cfg.event <- Event{Type: EventCreated, Name: name}
 	return nil
 }
 
 func (cfg *Conf) Enable(name string) error {
 	_, err := control(name, CmdEnable, !cfg.Global)
 	if err == nil {
-		cfg.eventEmitter.Enabled(name)
+		cfg.event <- Event{Type: EventEnabled, Name: name}
 	}
 	return err
 }
@@ -355,7 +354,7 @@ func (cfg *Conf) Enable(name string) error {
 func (cfg *Conf) Disable(name string) error {
 	_, err := control(name, CmdDisable, !cfg.Global)
 	if err == nil {
-		cfg.eventEmitter.Disabled(name)
+		cfg.event <- Event{Type: EventDisabled, Name: name}
 	}
 	return err
 }
@@ -397,7 +396,7 @@ func (cfg *Conf) Forget(name string) error {
 	if err != nil {
 		return err
 	}
-	cfg.eventEmitter.Removed(name)
+	cfg.event <- Event{Type: EventRemoved, Name: name}
 	return nil
 }
 
