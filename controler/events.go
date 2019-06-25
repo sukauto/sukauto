@@ -1,94 +1,68 @@
 package controler
 
-import "sync"
+type EventType int
 
-type ServiceEvents interface {
-	Created(name string)
-	Removed(name string)
-	Started(name string)
-	Restarted(name string)
-	Stopped(name string)
-	Updated(name string)
-	Enabled(name string)
-	Disabled(name string)
-}
+const (
+	EventCreated   EventType = 1
+	EventRemoved   EventType = 2
+	EventStarted   EventType = 3
+	EventRestarted EventType = 4
+	EventStopped   EventType = 5
+	EventUpdated   EventType = 6
+	EventEnabled   EventType = 7
+	EventDisabled  EventType = 8
+)
 
-type EventSubscriber interface {
-	Subscribe(listener ServiceEvents)
-}
-
-type ServiceEventsEmitter interface {
-	ServiceEvents
-	EventSubscriber
-}
-
-func NewEventEmitter() ServiceEventsEmitter {
-	return &eventEmitter{}
-}
-
-type eventEmitter struct {
-	listeners []ServiceEvents
-	lock      sync.RWMutex
-}
-
-func (ee *eventEmitter) Created(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Created(name)
+func (et EventType) String() string {
+	switch et {
+	case EventCreated:
+		return "created"
+	case EventRemoved:
+		return "removed"
+	case EventStarted:
+		return "started"
+	case EventRestarted:
+		return "restarted"
+	case EventStopped:
+		return "stopped"
+	case EventUpdated:
+		return "updated"
+	case EventEnabled:
+		return "enabled"
+	case EventDisabled:
+		return "disabled"
+	default:
+		return "unknown"
 	}
 }
 
-func (ee *eventEmitter) Removed(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Removed(name)
-	}
+type Event struct {
+	Type EventType
+	Name string
 }
 
-func (ee *eventEmitter) Started(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Started(name)
-	}
-}
-
-func (ee *eventEmitter) Restarted(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Restarted(name)
-	}
-}
-
-func (ee *eventEmitter) Stopped(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Stopped(name)
-	}
-}
-
-func (ee *eventEmitter) Updated(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Updated(name)
-	}
-}
-
-func (ee *eventEmitter) Enabled(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Enabled(name)
-	}
-}
-
-func (ee *eventEmitter) Disabled(name string) {
-	for _, listener := range ee.copyListeners() {
-		listener.Disabled(name)
-	}
-}
-
-func (ee *eventEmitter) Subscribe(listener ServiceEvents) {
-	ee.lock.Lock()
-	defer ee.lock.Unlock()
-	ee.listeners = append(ee.listeners, listener)
-}
-
-func (ee *eventEmitter) copyListeners() []ServiceEvents {
-	ee.lock.RLock()
-	defer ee.lock.RUnlock()
-	var ans = make([]ServiceEvents, len(ee.listeners))
-	copy(ans, ee.listeners)
-	return ans
+func WithStateFilter(events <-chan Event) <-chan Event {
+	state := make(map[string]bool)
+	res := make(chan Event)
+	go func() {
+		defer close(res)
+		for event := range events {
+			ok := false
+			switch event.Type {
+			case EventStarted:
+				ok = !state[event.Name]
+				state[event.Name] = true
+			case EventStopped:
+				running, exists := state[event.Name]
+				ok = !exists || running
+				state[event.Name] = false
+			default:
+				ok = true
+			}
+			if ok {
+				res <- event
+			}
+		}
+	}()
+	return res
 }

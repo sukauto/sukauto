@@ -18,3 +18,10 @@ Check commit
   "global": true
   
 }
+
+
+## Check executable environment
+
+
+* `SERVICE` - service name
+* `EVENT` - event name (created, remove, started, stopped, restarted, updated, enabled, disabled) 
