@@ -150,10 +150,10 @@ func (cfg *Conf) Join(groupName string, serviceName string) error {
 func (cfg *Conf) Leave(groupName string, serviceName string) error {
 	cfg.lock.Lock()
 	defer cfg.lock.Unlock()
-	for i, srv := range cfg.GroupsList[serviceName] {
+	for i, srv := range cfg.GroupsList[groupName] {
 		if srv == serviceName {
-			ar := cfg.GroupsList[serviceName]
-			cfg.GroupsList[serviceName] = append(ar[:i], ar[i+1:]...)
+			ar := cfg.GroupsList[groupName]
+			cfg.GroupsList[groupName] = append(ar[:i], ar[i+1:]...)
 			return cfg.saveUnsafe()
 		}
 	}
