@@ -22,6 +22,7 @@ type Access interface {
 }
 
 type ServiceController interface {
+	Events() EventSubscriber
 	RefreshStatus() AllStatuses
 	Status(name string) ServiceStatus
 	Restart(name string) error
@@ -50,13 +51,14 @@ type AccessServiceController interface {
 }
 
 type Conf struct {
-	Services   []string            `json:"services,omitempty"`
-	GroupsList map[string][]string `json:"groups,omitempty"`
-	Global     bool                `json:"global"` // as a system-wide services, otherwise - user based
-	Users      map[string]string   `json:"users"`  // no users means no login
-	location   string              `json:"-"`      // config file location
-	updCmd     string
-	lock       sync.RWMutex
+	Services     []string            `json:"services,omitempty"`
+	GroupsList   map[string][]string `json:"groups,omitempty"`
+	Global       bool                `json:"global"` // as a system-wide services, otherwise - user based
+	Users        map[string]string   `json:"users"`  // no users means no login
+	location     string              `json:"-"`      // config file location
+	updCmd       string
+	eventEmitter ServiceEventsEmitter
+	lock         sync.RWMutex
 }
 
 func NewServiceControllerByPath(location string, updcmd string) AccessServiceController {
@@ -64,9 +66,10 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	if os.IsNotExist(err) {
 		// create default
 		cfg := &Conf{
-			Users:    map[string]string{"root": "root"},
-			location: location,
-			updCmd:   updcmd,
+			Users:        map[string]string{"root": "root"},
+			location:     location,
+			updCmd:       updcmd,
+			eventEmitter: NewEventEmitter(),
 		}
 		err = cfg.save()
 		if err != nil {
@@ -84,13 +87,17 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	}
 	data.location = location
 	data.updCmd = updcmd
-
+	data.eventEmitter = NewEventEmitter()
 	fmt.Printf("[MONITOR]: Append srv list: %s", &data.Services)
 	return &data
 }
 
 func NewServiceController(cmdUpd string) AccessServiceController {
 	return NewServiceControllerByPath(CFG_PATH, cmdUpd)
+}
+
+func (cfg *Conf) Events() EventSubscriber {
+	return cfg.eventEmitter
 }
 
 func (cfg *Conf) Groups() []string {
@@ -187,6 +194,8 @@ func (cfg *Conf) Restart(name string) error {
 	if err != nil {
 		fmt.Printf("[ERROR]: Restart srv: %s", name)
 		return err
+	} else {
+		cfg.eventEmitter.Restarted(name)
 	}
 	return nil
 }
@@ -196,6 +205,8 @@ func (cfg *Conf) Run(name string) error {
 	if err != nil {
 		fmt.Printf("[ERROR]: Run srv: %s", name)
 		return err
+	} else {
+		cfg.eventEmitter.Started(name)
 	}
 	return nil
 }
@@ -205,6 +216,8 @@ func (cfg *Conf) Stop(name string) error {
 	if err != nil {
 		fmt.Printf("[ERROR]: Run srv: %s", name)
 		return err
+	} else {
+		cfg.eventEmitter.Stopped(name)
 	}
 	return nil
 }
@@ -232,6 +245,7 @@ func (cfg *Conf) Update(name string) error {
 			return err
 		}
 	}
+	cfg.eventEmitter.Updated(name)
 	return nil
 }
 
@@ -310,23 +324,39 @@ func (cfg *Conf) Create(service NewService) error {
 	// save to config
 	// TODO: maybe save full information
 	cfg.Services = append(cfg.Services, service.Name)
-	return cfg.saveUnsafe()
+	err = cfg.saveUnsafe()
+	if err != nil {
+		return err
+	}
+	cfg.eventEmitter.Created(service.Name)
+	return nil
 }
 
 func (cfg *Conf) Attach(name string) error {
 	cfg.lock.Lock()
 	defer cfg.lock.Unlock()
 	cfg.Services = append(cfg.Services, name)
-	return cfg.saveUnsafe()
+	err := cfg.saveUnsafe()
+	if err != nil {
+		return err
+	}
+	cfg.eventEmitter.Created(name)
+	return nil
 }
 
 func (cfg *Conf) Enable(name string) error {
 	_, err := control(name, CmdEnable, !cfg.Global)
+	if err == nil {
+		cfg.eventEmitter.Enabled(name)
+	}
 	return err
 }
 
 func (cfg *Conf) Disable(name string) error {
 	_, err := control(name, CmdDisable, !cfg.Global)
+	if err == nil {
+		cfg.eventEmitter.Disabled(name)
+	}
 	return err
 }
 
@@ -363,7 +393,12 @@ func (cfg *Conf) Forget(name string) error {
 			}
 		}
 	}
-	return cfg.saveUnsafe()
+	err := cfg.saveUnsafe()
+	if err != nil {
+		return err
+	}
+	cfg.eventEmitter.Removed(name)
+	return nil
 }
 
 func (cfg *Conf) save() error {
