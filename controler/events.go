@@ -1,49 +1,39 @@
 package controler
 
-type EventType int
-
-const (
-	EventCreated   EventType = 1
-	EventRemoved   EventType = 2
-	EventStarted   EventType = 3
-	EventRestarted EventType = 4
-	EventStopped   EventType = 5
-	EventUpdated   EventType = 6
-	EventEnabled   EventType = 7
-	EventDisabled  EventType = 8
+import (
+	"encoding/json"
+	"strings"
 )
 
-func (et EventType) String() string {
-	switch et {
-	case EventCreated:
-		return "created"
-	case EventRemoved:
-		return "removed"
-	case EventStarted:
-		return "started"
-	case EventRestarted:
-		return "restarted"
-	case EventStopped:
-		return "stopped"
-	case EventUpdated:
-		return "updated"
-	case EventEnabled:
-		return "enabled"
-	case EventDisabled:
-		return "disabled"
-	default:
-		return "unknown"
+//go:generate go-enum -f=$GOFILE --marshal --lower
+/*
+ENUM(
+Created, Removed, Started, Restarted, Stopped, Updated, Enabled, Disabled, Joined, Leaved
+)
+*/
+type Event int
+
+func (x Event) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + strings.ToLower(x.String()) + "\""), nil
+}
+
+func (x *Event) UnmarshalJSON(data []byte) error {
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
 	}
+	return x.UnmarshalText([]byte(str))
 }
 
-type Event struct {
-	Type EventType
-	Name string
+type SystemEvent struct {
+	Type Event  `json:"type"`
+	Name string `json:"name"`
 }
 
-func WithStateFilter(events <-chan Event) <-chan Event {
+func WithStateFilter(events <-chan SystemEvent) <-chan SystemEvent {
 	state := make(map[string]bool)
-	res := make(chan Event)
+	res := make(chan SystemEvent)
 	go func() {
 		defer close(res)
 		for event := range events {

@@ -19,3 +19,13 @@ type NewService struct {
 type PreparedService struct {
 	Name string `json:"name" form:"name" bind:"command"`
 }
+
+type Group struct {
+	Name    string   `json:"name"`
+	Members []string `json:"members"`
+}
+
+type Snapshot struct {
+	Services []ServiceStatus `json:"services"`
+	Groups   []Group         `json:"groups"`
+}

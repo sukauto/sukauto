@@ -31,6 +31,7 @@ func main() {
 	if config.StatusScript != "" {
 		events = controler.WithScriptRunner(events, config.StatusScript)
 	}
+	events, httpEvents := controler.Tee(events)
 	// ....
 	go func() {
 		for event := range events {
@@ -40,7 +41,7 @@ func main() {
 
 	// setup integration
 	var access controler.Access = monitor
-	router := integration.NewHTTP(monitor, access, config.CORS)
+	router := integration.NewHTTP(monitor, access, config.CORS, httpEvents)
 
 	panic(router.Run(config.Bind))
 }
