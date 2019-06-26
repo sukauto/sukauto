@@ -2,8 +2,12 @@ package integration
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/websocket"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,8 +19,34 @@ type CorsConfig struct {
 	Origin string `long:"origin" env:"ORIGIN" description:"CORS origin host" default:"*"`
 }
 
-func NewHTTP(controller controler.ServiceController, access controler.Access, cors CorsConfig) *gin.Engine {
+func NewHTTP(controller controler.ServiceController, access controler.Access, cors CorsConfig, events <-chan controler.SystemEvent) *gin.Engine {
 	router := gin.Default()
+
+	subscribe := make(chan *websocket.Conn)
+	unsubscribe := make(chan *websocket.Conn)
+	go func() {
+		var subscribers []*websocket.Conn
+		for {
+			select {
+			case conn := <-subscribe:
+				subscribers = append(subscribers, conn)
+			case conn := <-unsubscribe:
+				for i, s := range subscribers {
+					if s == conn {
+						n := len(subscribers)
+						subscribers[i] = subscribers[n-1]
+						subscribers = subscribers[:n-1]
+						break
+					}
+				}
+			case event := <-events:
+				payload, _ := json.MarshalIndent(event, "", "  ")
+				for _, s := range subscribers {
+					s.Write(payload)
+				}
+			}
+		}
+	}()
 
 	if cors.Allow {
 		router.Use(CORSMiddleware(cors))
@@ -50,6 +80,16 @@ func NewHTTP(controller controler.ServiceController, access controler.Access, co
 		gctx.Header(WWWAuthHeader, hRealm)
 		gctx.AbortWithStatus(http.StatusUnauthorized)
 	})
+
+	authOnly.GET("/", func(gctx *gin.Context) {
+		gctx.IndentedJSON(http.StatusOK, controller.Snapshot())
+	})
+	authOnly.GET("/ws", gin.WrapH(websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		subscribe <- ws
+		io.Copy(ioutil.Discard, ws)
+		unsubscribe <- ws
+	})))
 	authOnly.GET("/run/:name", func(gctx *gin.Context) {
 		name := strings.ToLower(strings.TrimSpace(gctx.Param("name")))
 		if err := controller.Run(name); err != nil {
