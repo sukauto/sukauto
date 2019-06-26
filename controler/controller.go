@@ -34,6 +34,7 @@ type ServiceController interface {
 	Attach(name string) error // attach exists service
 	Forget(name string) error // forget about service
 	Log(name string) (string, error)
+	Snapshot() Snapshot
 	Groups() []string
 	// Create new group
 	Group(name string) error
@@ -42,7 +43,7 @@ type ServiceController interface {
 	Members(groupName string) []string
 	Join(groupName string, serviceName string) error
 	Leave(groupName string, serviceName string) error
-	Events() <-chan Event
+	Events() <-chan SystemEvent
 }
 
 type AccessServiceController interface {
@@ -56,7 +57,7 @@ type Conf struct {
 	Global     bool                `json:"global"` // as a system-wide services, otherwise - user based
 	Users      map[string]string   `json:"users"`  // no users means no login
 	location   string              `json:"-"`      // config file location
-	event      chan Event
+	event      chan SystemEvent
 	updCmd     string
 	lock       sync.RWMutex
 }
@@ -69,7 +70,7 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 			Users:    map[string]string{"root": "root"},
 			location: location,
 			updCmd:   updcmd,
-			event:    make(chan Event),
+			event:    make(chan SystemEvent),
 		}
 		err = cfg.save()
 		if err != nil {
@@ -87,7 +88,7 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	}
 	data.location = location
 	data.updCmd = updcmd
-	data.event = make(chan Event)
+	data.event = make(chan SystemEvent)
 	fmt.Printf("[MONITOR]: Append srv list: %s", &data.Services)
 	return &data
 }
@@ -96,8 +97,21 @@ func NewServiceController(cmdUpd string) AccessServiceController {
 	return NewServiceControllerByPath(CFG_PATH, cmdUpd)
 }
 
-func (cfg *Conf) Events() <-chan Event {
+func (cfg *Conf) Events() <-chan SystemEvent {
 	return cfg.event
+}
+
+func (cfg *Conf) Snapshot() Snapshot {
+	cfg.lock.RLock()
+	defer cfg.lock.RUnlock()
+
+	var ans Snapshot
+	ans.Services = cfg.RefreshStatus().Services
+	ans.Groups = make([]Group, 0, len(cfg.GroupsList))
+	for name, services := range cfg.GroupsList {
+		ans.Groups = append(ans.Groups, Group{Name: name, Members: services})
+	}
+	return ans
 }
 
 func (cfg *Conf) Groups() []string {
@@ -154,7 +168,12 @@ func (cfg *Conf) Join(groupName string, serviceName string) error {
 		return errors.New("service not exists")
 	}
 	cfg.GroupsList[groupName] = append(cfg.GroupsList[groupName], serviceName)
-	return cfg.saveUnsafe()
+	err := cfg.saveUnsafe()
+	if err != nil {
+		return err
+	}
+	cfg.event <- SystemEvent{Type: EventJoined, Name: serviceName}
+	return nil
 }
 
 func (cfg *Conf) Leave(groupName string, serviceName string) error {
@@ -164,7 +183,12 @@ func (cfg *Conf) Leave(groupName string, serviceName string) error {
 		if srv == serviceName {
 			ar := cfg.GroupsList[groupName]
 			cfg.GroupsList[groupName] = append(ar[:i], ar[i+1:]...)
-			return cfg.saveUnsafe()
+			err := cfg.saveUnsafe()
+			if err != nil {
+				return err
+			}
+			cfg.event <- SystemEvent{Type: EventLeaved, Name: serviceName}
+			return nil
 		}
 	}
 	return nil
@@ -194,7 +218,7 @@ func (cfg *Conf) Restart(name string) error {
 		fmt.Printf("[ERROR]: Restart srv: %s", name)
 		return err
 	} else {
-		cfg.event <- Event{Type: EventRestarted, Name: name}
+		cfg.event <- SystemEvent{Type: EventRestarted, Name: name}
 	}
 	return nil
 }
@@ -205,7 +229,7 @@ func (cfg *Conf) Run(name string) error {
 		fmt.Printf("[ERROR]: Run srv: %s", name)
 		return err
 	} else {
-		cfg.event <- Event{Type: EventStarted, Name: name}
+		cfg.event <- SystemEvent{Type: EventStarted, Name: name}
 	}
 	return nil
 }
@@ -216,7 +240,7 @@ func (cfg *Conf) Stop(name string) error {
 		fmt.Printf("[ERROR]: Run srv: %s", name)
 		return err
 	} else {
-		cfg.event <- Event{Type: EventStopped, Name: name}
+		cfg.event <- SystemEvent{Type: EventStopped, Name: name}
 	}
 	return nil
 }
@@ -244,7 +268,7 @@ func (cfg *Conf) Update(name string) error {
 			return err
 		}
 	}
-	cfg.event <- Event{Type: EventUpdated, Name: name}
+	cfg.event <- SystemEvent{Type: EventUpdated, Name: name}
 	return nil
 }
 
@@ -327,7 +351,7 @@ func (cfg *Conf) Create(service NewService) error {
 	if err != nil {
 		return err
 	}
-	cfg.event <- Event{Type: EventCreated, Name: service.Name}
+	cfg.event <- SystemEvent{Type: EventCreated, Name: service.Name}
 	return nil
 }
 
@@ -339,14 +363,14 @@ func (cfg *Conf) Attach(name string) error {
 	if err != nil {
 		return err
 	}
-	cfg.event <- Event{Type: EventCreated, Name: name}
+	cfg.event <- SystemEvent{Type: EventCreated, Name: name}
 	return nil
 }
 
 func (cfg *Conf) Enable(name string) error {
 	_, err := control(name, CmdEnable, !cfg.Global)
 	if err == nil {
-		cfg.event <- Event{Type: EventEnabled, Name: name}
+		cfg.event <- SystemEvent{Type: EventEnabled, Name: name}
 	}
 	return err
 }
@@ -354,7 +378,7 @@ func (cfg *Conf) Enable(name string) error {
 func (cfg *Conf) Disable(name string) error {
 	_, err := control(name, CmdDisable, !cfg.Global)
 	if err == nil {
-		cfg.event <- Event{Type: EventDisabled, Name: name}
+		cfg.event <- SystemEvent{Type: EventDisabled, Name: name}
 	}
 	return err
 }
@@ -396,7 +420,7 @@ func (cfg *Conf) Forget(name string) error {
 	if err != nil {
 		return err
 	}
-	cfg.event <- Event{Type: EventRemoved, Name: name}
+	cfg.event <- SystemEvent{Type: EventRemoved, Name: name}
 	return nil
 }
 

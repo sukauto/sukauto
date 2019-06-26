@@ -43,3 +43,8 @@ const (
 	LocationGlobal = "/etc/systemd/system"
 	LocationUser   = "/.config/systemd/user" // prefix is $HOME
 )
+
+const (
+	EnvService = "SERVICE"
+	EnvEvent   = "EVENT"
+)

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-func WithBackgroundCheck(events <-chan Event, interval time.Duration, controller ServiceController) <-chan Event {
-	ans := make(chan Event)
+func WithBackgroundCheck(events <-chan SystemEvent, interval time.Duration, controller ServiceController) <-chan SystemEvent {
+	ans := make(chan SystemEvent)
 	go func() {
 		defer close(ans)
 		ticker := time.NewTicker(interval)
@@ -20,9 +20,9 @@ func WithBackgroundCheck(events <-chan Event, interval time.Duration, controller
 				statuses := controller.RefreshStatus()
 				for _, status := range statuses.Services {
 					if status.Status == "running" {
-						ans <- Event{Type: EventStarted, Name: status.Name}
+						ans <- SystemEvent{Type: EventStarted, Name: status.Name}
 					} else {
-						ans <- Event{Type: EventStopped, Name: status.Name}
+						ans <- SystemEvent{Type: EventStopped, Name: status.Name}
 					}
 				}
 			case event, ok := <-events:
@@ -36,8 +36,8 @@ func WithBackgroundCheck(events <-chan Event, interval time.Duration, controller
 	return ans
 }
 
-func WithScriptRunner(events <-chan Event, command string) <-chan Event {
-	ans := make(chan Event)
+func WithScriptRunner(events <-chan SystemEvent, command string) <-chan SystemEvent {
+	ans := make(chan SystemEvent)
 	go func() {
 		defer close(ans)
 		for event := range events {
@@ -45,8 +45,8 @@ func WithScriptRunner(events <-chan Event, command string) <-chan Event {
 			cmd.Env = os.Environ()
 			cmd.Stderr = os.Stderr
 			cmd.Stdout = os.Stdout
-			cmd.Env = append(cmd.Env, "SERVICE="+event.Name)
-			cmd.Env = append(cmd.Env, "EVENT="+event.Type.String())
+			cmd.Env = append(cmd.Env, EnvService+"="+event.Name)
+			cmd.Env = append(cmd.Env, EnvEvent+"="+event.Type.String())
 			if err := cmd.Run(); err != nil {
 				log.Println("failed run script", command, ":", err)
 			}
@@ -54,4 +54,17 @@ func WithScriptRunner(events <-chan Event, command string) <-chan Event {
 		}
 	}()
 	return ans
+}
+
+func Tee(events <-chan SystemEvent) (<-chan SystemEvent, <-chan SystemEvent) {
+	a, b := make(chan SystemEvent), make(chan SystemEvent)
+	go func() {
+		defer close(a)
+		defer close(b)
+		for event := range events {
+			a <- event
+			b <- event
+		}
+	}()
+	return a, b
 }
