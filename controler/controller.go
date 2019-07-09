@@ -89,7 +89,7 @@ func NewServiceControllerByPath(location string, updcmd string) AccessServiceCon
 	data.location = location
 	data.updCmd = updcmd
 	data.event = make(chan SystemEvent)
-	fmt.Printf("[MONITOR]: Append srv list: %s", &data.Services)
+	fmt.Printf("[MONITOR]: Append srv list: %s\n", &data.Services)
 	return &data
 }
 
