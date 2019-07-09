@@ -16,6 +16,8 @@ var config struct {
 	CORS          integration.CorsConfig `group:"cors" env-namespace:"CORS" namespace:"cors"`
 	CheckInterval time.Duration          `long:"check-interval" env:"CHECK_INTERVAL" description:"Background check interval" default:"15s"`
 	StatusScript  string                 `long:"status-script" env:"STATUS_SCRIPT" description:"Script to run for services events"`
+	// plugins
+	Telegram integration.ExtraTelegram `group:"telegram plugin" env-namespace:"TG" namespace:"tg"`
 }
 
 func main() {
@@ -32,10 +34,17 @@ func main() {
 		events = controler.WithScriptRunner(events, config.StatusScript)
 	}
 	events, httpEvents := controler.Tee(events)
+	events, tgEvents := controler.Tee(events)
 	// ....
 	go func() {
 		for event := range events {
 			log.Println(event.Name, event.Type.String())
+		}
+	}()
+	// plugins
+	go func() {
+		if err := config.Telegram.Run(tgEvents); err != nil {
+			log.Println("telegram plugin failed:", err)
 		}
 	}()
 
