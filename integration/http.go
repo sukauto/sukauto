@@ -20,8 +20,9 @@ type CorsConfig struct {
 }
 
 func NewHTTP(controller controler.ServiceController, access controler.Access, cors CorsConfig, events <-chan controler.SystemEvent) *gin.Engine {
-	router := gin.Default()
-
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
 	subscribe := make(chan *websocket.Conn)
 	unsubscribe := make(chan *websocket.Conn)
 	go func() {

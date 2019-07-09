@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/jessevdk/go-flags"
 	"log"
 	"os"
 	"sukauto/controler"
 	"sukauto/integration"
+	"sukauto/utils"
 	"time"
 )
 
@@ -25,6 +27,8 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+	fmt.Println(utils.Logo)
+	fmt.Println("SUKAUTO - monitoring system")
 	monitor := controler.NewServiceControllerByPath(config.ConfigFile, config.UpdCmd)
 	// setup listeners
 	events := monitor.Events()
