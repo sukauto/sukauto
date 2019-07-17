@@ -38,24 +38,28 @@ func main() {
 	if config.StatusScript != "" {
 		events = controler.WithScriptRunner(events, config.StatusScript)
 	}
-	events, httpEvents := controler.Tee(events)
-	events, tgEvents := controler.Tee(events)
 	// ....
+	out, drain := controler.Tee(events)
 	go func() {
-		for event := range events {
+		for event := range drain {
 			log.Println(event.Name, event.Type.String())
 		}
 	}()
-	// plugins
-	go func() {
-		if err := config.Telegram.Run(monitor, tgEvents); err != nil {
-			log.Println("telegram plugin failed:", err)
-		}
-	}()
+	events = out
+	if config.Telegram.Enable {
+		out, tgEvents := controler.Tee(events)
+		// plugins
+		go func() {
+			if err := config.Telegram.Run(monitor, tgEvents); err != nil {
+				log.Println("telegram plugin failed:", err)
+			}
+		}()
+		events = out
+	}
 
 	// setup integration
 	var access controler.Access = monitor
-	router := integration.NewHTTP(monitor, access, config.CORS, httpEvents)
+	router := integration.NewHTTP(monitor, access, config.CORS, events)
 
 	panic(router.Run(config.Bind))
 }
