@@ -39,11 +39,13 @@ func main() {
 		events = controler.WithScriptRunner(events, config.StatusScript)
 	}
 	// ....
+	out, drain := controler.Tee(events)
 	go func() {
-		for event := range events {
+		for event := range drain {
 			log.Println(event.Name, event.Type.String())
 		}
 	}()
+	events = out
 	if config.Telegram.Enable {
 		out, tgEvents := controler.Tee(events)
 		// plugins
